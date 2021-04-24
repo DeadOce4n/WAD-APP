@@ -1,0 +1,13 @@
+<Page loaded="onPageLoaded">
+    <ActionBar title="Control" icon="" />
+    <DockLayout stretchLastChild="true" className="p-20">
+        <Label text="Select an action to perform:" dock="top"></Label>
+        <Button text="Disconnect" tap="onTap" className="bottom" dock="bottom" id="exit"></Button>
+        <StackLayout>
+            <Button text="Kiss" tap="onTap" className="action" id="kiss"></Button>
+            <Button text="Hug" tap="onTap" className="action" id="hug"></Button>
+            <Button text="Pat" tap="onTap" className="action" id="pat"></Button>
+            <Button text="Tickles" tap="onTap" className="action" id="tickles"></Button>
+        </StackLayout>
+    </DockLayout>
+</Page>

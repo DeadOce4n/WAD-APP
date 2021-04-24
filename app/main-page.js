@@ -1,40 +1,78 @@
-/*
-In NativeScript, a file with the same name as an XML file is known as
-a code-behind file. The code-behind is a great place to place your view
-logic, and to set up your page’s data binding.
-*/
+import { Bluetooth } from '@nativescript-community/ble'
+import { Toasty, ToastDuration } from '@triniwiz/nativescript-toasty'
+import {
+    Observable,
+    ObservableArray,
+    Frame
+} from '@nativescript/core'
 
-/*
-NativeScript adheres to the CommonJS specification for dealing with
-JavaScript modules. The CommonJS require() function is how you import
-JavaScript modules defined in other files.
-*/
-import { createViewModel } from './main-view-model';
+export const bluetooth = new Bluetooth()
+const devicesArray = new ObservableArray([])
+const toastDisabled = new Toasty({ text: 'Bluetooth not enabled.' })
+const toastDisconnected = new Toasty({ text: 'Device disconnected.' })
+const toastScanning = new Toasty({ text: 'Scanning for devices...', duration: ToastDuration.LONG })
 
-export function onNavigatingTo(args) {
-  /*
-    This gets a reference this page’s <Page> UI component. You can
-    view the API reference of the Page to see what’s available at
-    https://docs.nativescript.org/api-reference/classes/_ui_page_.page.html
-    */
-  const page = args.object
-
-  /*
-    A page’s bindingContext is an object that should be used to perform
-    data binding between XML markup and JavaScript code. Properties
-    on the bindingContext can be accessed using the {{ }} syntax in XML.
-    In this example, the {{ message }} and {{ onTap }} bindings are resolved
-    against the object returned by createViewModel().
-
-    You can learn more about data binding in NativeScript at
-    https://docs.nativescript.org/core-concepts/data-binding.
-    */
-  page.bindingContext = createViewModel()
+export function onPageLoaded (args) {
+    const page = args.object
+    const vm = new Observable()
+    vm.devicesArray = devicesArray
+    page.bindingContext = vm
 }
 
-/*
-Exporting a function in a NativeScript code-behind file makes it accessible
-to the file’s corresponding XML file. In this case, exporting the onNavigatingTo
-function here makes the navigatingTo="onNavigatingTo" binding in this page’s XML
-file work.
-*/
+export function onListViewLoaded (args) {
+    const listView = args.object
+    return listView
+}
+
+export function onRefresh () {
+    const scanResult = []
+    function _startScanning () {
+        bluetooth.startScanning({
+            seconds: 5,
+            onDiscovered: rawDevice => {
+                const device = {}; device.name = rawDevice.name; device.UUID = rawDevice.UUID
+                if (scanResult.length === 0 || !scanResult.some(x => x.UUID === device.UUID)) {
+                    scanResult.push(device)
+                }
+            }
+        }).then(() => {
+            for (let i = 0; i < scanResult.length; i++) {
+                if (!devicesArray.some(x => x.UUID === scanResult[i].UUID)) {
+                    devicesArray.push(scanResult[i])
+                }
+            }
+        })
+    }
+    bluetooth.isBluetoothEnabled().then(enabled => {
+        if (enabled === false) {
+            toastDisabled.show()
+            bluetooth.enable().then(enabled => {
+                if (enabled === false) {
+                    toastDisabled.show()
+                } else {
+                    toastScanning.show()
+                    _startScanning()
+                }
+            })
+        } else {
+            toastScanning.show()
+            _startScanning()
+        }
+    })
+}
+
+export function onItemTap (args) {
+    const index = args.index
+    bluetooth.connectedUUID = devicesArray.getItem(index).UUID
+    bluetooth.connect({
+        UUID: bluetooth.connectedUUID,
+        onConnected: device => {
+            const toastConnected = new Toasty({ text: `Connected to: ${device.name || device.UUID}` })
+            toastConnected.show()
+        },
+        onDisconnected: () => toastDisconnected.show()
+    }).then(() => {
+        const frame = Frame.getFrameById('mainFrame')
+        frame.navigate('control-page')
+    }).catch(() => alert('Bluetooth not enabled, please enable it.'))
+}
